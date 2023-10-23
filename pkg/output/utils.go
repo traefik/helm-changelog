@@ -1,8 +1,8 @@
 package output
 
 import (
-	"github.com/mogensen/helm-changelog/pkg/git"
-	"github.com/mogensen/helm-changelog/pkg/helm"
+	"github.com/mloiseleur/helm-changelog/pkg/git"
+	"github.com/mloiseleur/helm-changelog/pkg/helm"
 )
 
 func reverseReleases(a []*helm.Release) []*helm.Release {
