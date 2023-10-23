@@ -72,9 +72,6 @@ func Markdown(log *logrus.Logger, changeLogFilePath string, releases []*helm.Rel
 			f.WriteString(fmt.Sprintf("* %s\n", l.Subject))
 		}
 
-		for _, l := range release.Commits {
-			f.WriteString(fmt.Sprintf("* %s\n", strings.TrimSpace(l.Subject)))
-		}
 		f.WriteString("\n")
 
 		if release.ValueDiff != "" {
