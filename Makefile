@@ -23,7 +23,7 @@ build: ## Build binary
 verify: test build ## tests and builds
 
 image: ## build docker image
-	docker build -t mogensen/${PROJECT_NAME}:${VERSION} .
+	docker build -t ghcr.io/mloiseleur/${PROJECT_NAME}:${VERSION} .
 
 clean: ## clean up created files
 	rm -rf \
