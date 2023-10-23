@@ -4,16 +4,16 @@ import (
 	"fmt"
 	"net/url"
 	"os"
+	"sort"
 	"strings"
 
 	"github.com/sirupsen/logrus"
 
-	"github.com/mogensen/helm-changelog/pkg/helm"
+	"github.com/mloiseleur/helm-changelog/pkg/helm"
 )
 
 // Markdown creates a markdown representation of the changelog at the changeLogFilePath path
 func Markdown(log *logrus.Logger, changeLogFilePath string, releases []*helm.Release) {
-
 	// reverse commits
 	for _, release := range releases {
 		release.Commits = reverseCommits(release.Commits)
@@ -65,6 +65,11 @@ func Markdown(log *logrus.Logger, changeLogFilePath string, releases []*helm.Rel
 
 		if release.ReleaseDate != nil {
 			f.WriteString(fmt.Sprintf("**Release date:** %s\n\n", release.ReleaseDate.Format("2006-01-02")))
+		}
+
+		sort.Slice(release.Commits, func(i, j int) bool { return release.Commits[i].Subject > release.Commits[j].Subject })
+		for _, l := range release.Commits {
+			f.WriteString(fmt.Sprintf("* %s\n", l.Subject))
 		}
 
 		for _, l := range release.Commits {

@@ -4,12 +4,11 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/mogensen/helm-changelog/pkg/git"
+	"github.com/mloiseleur/helm-changelog/pkg/git"
 	"github.com/sirupsen/logrus"
 )
 
 func CreateHelmReleases(log *logrus.Logger, chartFile, chartDir string, g git.Git, commits []git.GitCommit) []*Release {
-
 	res := []*Release{}
 	currentRelease := ""
 	releaseCommits := []git.GitCommit{}
@@ -71,7 +70,6 @@ func CreateHelmReleases(log *logrus.Logger, chartFile, chartDir string, g git.Gi
 }
 
 func createValueDiffs(res []*Release, g git.Git, chartFile, chartDir string) {
-
 	fullValuesFile := filepath.Join(filepath.Dir(chartFile), "values.yaml")
 	relativeValuesFile := filepath.Join(chartDir, "values.yaml")
 	// Diff values files across versions

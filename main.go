@@ -1,6 +1,6 @@
 package main
 
-import "github.com/mogensen/helm-changelog/cmd"
+import "github.com/mloiseleur/helm-changelog/cmd"
 
 func main() {
 	cmd.Execute()

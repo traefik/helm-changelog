@@ -6,9 +6,9 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/mogensen/helm-changelog/pkg/git"
-	"github.com/mogensen/helm-changelog/pkg/helm"
-	"github.com/mogensen/helm-changelog/pkg/output"
+	"github.com/mloiseleur/helm-changelog/pkg/git"
+	"github.com/mloiseleur/helm-changelog/pkg/helm"
+	"github.com/mloiseleur/helm-changelog/pkg/output"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )
@@ -20,7 +20,6 @@ var rootCmd = &cobra.Command{
 	Use:   "helm-changelog",
 	Short: "Create changelogs for Helm Charts, based on git history",
 	Run: func(cmd *cobra.Command, args []string) {
-
 		log := logrus.StandardLogger()
 
 		currentDir, err := os.Getwd()
