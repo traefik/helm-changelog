@@ -1,39 +1,35 @@
 name: Build and Test
 
 on:
-  push:
+  pull_request:
+    types: [opened, reopened, synchronize, ready_for_review]
     branches:
       - 'main'
-  pull_request:
-    branches:
-      - '*'
+
+permissions:
+  contents: write
 
 jobs:
   build:
+    if: "!github.event.pull_request.draft"
     strategy:
       matrix:
         os: [ubuntu-latest, macOS-latest, windows-latest]
     runs-on: ${{ matrix.os }}
     name: Build & Test
     steps:
-      -
-        name: Checkout
-        uses: actions/checkout@v2
-      -
-        name: Setup go
-        uses: actions/setup-go@v2
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup go
+        uses: actions/setup-go@v5
         with:
           go-version: '^1.16.0'
-      -
-        name: Download dependencies
+
+      - name: Download dependencies
         run: go mod download
-      -
-        name: Build & Test
+
+      - name: Build & Test
         run: |
           go build -o ./helm-changelog -v ./cmd/
           go test ./...
-      -
-        name: Run GoReleaser
-        uses: goreleaser/goreleaser-action@v2
-        with:
-          args: release --snapshot --skip-publish --rm-dist
