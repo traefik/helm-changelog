@@ -6,11 +6,11 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/mloiseleur/helm-changelog/pkg/git"
-	"github.com/mloiseleur/helm-changelog/pkg/helm"
-	"github.com/mloiseleur/helm-changelog/pkg/output"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
+	"github.com/traefik/helm-changelog/pkg/git"
+	"github.com/traefik/helm-changelog/pkg/helm"
+	"github.com/traefik/helm-changelog/pkg/output"
 )
 
 var changelogFilename string

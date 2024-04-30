@@ -1,4 +1,4 @@
-module github.com/mloiseleur/helm-changelog
+module github.com/traefik/helm-changelog
 
 go 1.21
 
