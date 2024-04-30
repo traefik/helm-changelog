@@ -9,7 +9,7 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	"github.com/mloiseleur/helm-changelog/pkg/helm"
+	"github.com/traefik/helm-changelog/pkg/helm"
 )
 
 // Markdown creates a markdown representation of the changelog at the changeLogFilePath path

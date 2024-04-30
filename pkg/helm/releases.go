@@ -4,8 +4,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/mloiseleur/helm-changelog/pkg/git"
 	"github.com/sirupsen/logrus"
+	"github.com/traefik/helm-changelog/pkg/git"
 )
 
 func CreateHelmReleases(log *logrus.Logger, chartFile, chartDir string, g git.Git, commits []git.GitCommit) []*Release {
