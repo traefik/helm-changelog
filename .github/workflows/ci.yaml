@@ -7,7 +7,7 @@ on:
       - 'main'
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   build:
@@ -21,15 +21,13 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup go
+      - name: Setup Go
         uses: actions/setup-go@v5
         with:
-          go-version: '^1.16.0'
+          go-version-file: go.mod
 
-      - name: Download dependencies
-        run: go mod download
+      - name: Test
+        run: make test
 
-      - name: Build & Test
-        run: |
-          go build -o ./helm-changelog -v ./cmd/
-          go test ./...
+      - name: Build
+        run: make build

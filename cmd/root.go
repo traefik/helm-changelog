@@ -27,7 +27,7 @@ var rootCmd = &cobra.Command{
 			log.Fatal(err)
 		}
 
-		g := git.Git{Log: log}
+		g := &git.Git{Log: log}
 
 		gitBaseDir, err := g.FindGitRepositoryRoot()
 		if err != nil {
