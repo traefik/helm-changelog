@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/sirupsen/logrus"
+	"github.com/rs/zerolog"
 	"github.com/traefik/helm-changelog/pkg/git"
 )
 
@@ -18,7 +18,7 @@ type GitClient interface {
 // CreateHelmReleases builds a list of releases from git commit history.
 func CreateHelmReleases(
 	ctx context.Context,
-	log *logrus.Logger,
+	log *zerolog.Logger,
 	chartFile, chartDir string,
 	g GitClient,
 	commits []git.Commit,
@@ -29,27 +29,27 @@ func CreateHelmReleases(
 
 	var releaseCommits []git.Commit
 
-	log.Infof(" - Found commits for chart: %d\n", len(commits))
+	log.Info().Msgf(" - Found commits for chart: %d\n", len(commits))
 
 	for _, l := range commits {
 		releaseCommits = append(releaseCommits, l)
 
 		chartContent, err := g.GetFileContent(ctx, l.Hash, chartFile)
 		if err != nil {
-			log.Infof("Chart.yaml not found in: %s\n", l.Hash)
+			log.Info().Msgf("Chart.yaml not found in: %s\n", l.Hash)
 
 			continue
 		}
 
 		chart, err := GetChart(strings.NewReader(chartContent))
 		if err != nil {
-			log.Warnf("Ignoring Chart.yaml file that cannot be parsed: %s", err)
+			log.Warn().Msgf("Ignoring Chart.yaml file that cannot be parsed: %s", err)
 
 			continue
 		}
 
 		if chart.Version != currentRelease {
-			log.Infof(" - Found version: %s\n", chart.Version)
+			log.Info().Msgf(" - Found version: %s\n", chart.Version)
 
 			r := &Release{
 				ReleaseDate: l.Author.Date,
@@ -71,7 +71,7 @@ func CreateHelmReleases(
 
 func appendUnreleasedCommits(
 	ctx context.Context,
-	log *logrus.Logger,
+	log *zerolog.Logger,
 	res []*Release,
 	releaseCommits []git.Commit,
 	g GitClient,
@@ -88,7 +88,7 @@ func appendUnreleasedCommits(
 
 	chart, err := GetChart(strings.NewReader(chartContent))
 	if err != nil {
-		log.Warnf("Ignoring Chart.yaml file that cannot be parsed: %s", err)
+		log.Warn().Msgf("Ignoring Chart.yaml file that cannot be parsed: %s", err)
 
 		return res
 	}

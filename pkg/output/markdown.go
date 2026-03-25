@@ -10,29 +10,29 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/sirupsen/logrus"
+	"github.com/rs/zerolog"
 	"github.com/traefik/helm-changelog/pkg/helm"
 )
 
 // Markdown creates a markdown representation of the changelog at the changeLogFilePath path.
-func Markdown(log *logrus.Logger, changeLogFilePath string, releases []*helm.Release) {
+func Markdown(log *zerolog.Logger, changeLogFilePath string, releases []*helm.Release) {
 	for _, release := range releases {
 		slices.Reverse(release.Commits)
 	}
 
 	slices.Reverse(releases)
 
-	log.Debugf("Creating changelog file: %s", changeLogFilePath)
+	log.Debug().Msgf("Creating changelog file: %s", changeLogFilePath)
 
 	f, err := os.Create(filepath.Clean(changeLogFilePath))
 	if err != nil {
-		log.Fatalf("Failed creating changelog file")
+		log.Fatal().Msg("Failed creating changelog file")
 	}
 
 	defer func() {
 		cerr := f.Close()
 		if cerr != nil {
-			log.Errorf("Failed closing changelog file: %v", cerr)
+			log.Error().Err(cerr).Msg("Failed closing changelog file")
 		}
 	}()
 
@@ -50,7 +50,7 @@ func Markdown(log *logrus.Logger, changeLogFilePath string, releases []*helm.Rel
 	)
 }
 
-func writeReleaseHeader(log *logrus.Logger, f *os.File, release *helm.Release) {
+func writeReleaseHeader(log *zerolog.Logger, f *os.File, release *helm.Release) {
 	if release.Chart.Deprecated {
 		writeString(log, f, fmt.Sprintf("## %s (DEPRECATED)\n\n", release.Chart.Version))
 	} else {
@@ -70,7 +70,7 @@ func writeReleaseHeader(log *logrus.Logger, f *os.File, release *helm.Release) {
 	writeString(log, f, "\n\n")
 }
 
-func writeHelmBadges(log *logrus.Logger, f *os.File, apiVersion string) {
+func writeHelmBadges(log *zerolog.Logger, f *os.File, apiVersion string) {
 	switch apiVersion {
 	case "":
 		writeString(log, f, badge("Helm", "v2", "helm", "inactive"))
@@ -82,7 +82,7 @@ func writeHelmBadges(log *logrus.Logger, f *os.File, apiVersion string) {
 	}
 }
 
-func writeReleaseBody(log *logrus.Logger, f *os.File, release *helm.Release) {
+func writeReleaseBody(log *zerolog.Logger, f *os.File, release *helm.Release) {
 	if release.ReleaseDate != nil {
 		writeString(log, f, fmt.Sprintf(
 			"**Release date:** %s\n\n", release.ReleaseDate.Format("2006-01-02"),
@@ -109,10 +109,10 @@ func writeReleaseBody(log *logrus.Logger, f *os.File, release *helm.Release) {
 	writeString(log, f, "\n")
 }
 
-func writeString(log *logrus.Logger, f *os.File, s string) {
+func writeString(log *zerolog.Logger, f *os.File, s string) {
 	_, err := f.WriteString(s)
 	if err != nil {
-		log.Errorf("Failed writing to changelog file: %v", err)
+		log.Error().Err(err).Msg("Failed writing to changelog file")
 	}
 }
 
