@@ -1,0 +1,44 @@
+version: "2"
+
+linters:
+  default: all
+  disable:
+    - depguard
+    - exhaustruct
+    - gochecknoglobals
+    - ireturn
+    - mnd
+    - varnamelen
+    - wsl
+  exclusions:
+    generated: lax
+    rules:
+      # Git commands require dynamic argument construction.
+      # Inputs are validated (validateGitRef) and cleaned (filepath.Clean) before use.
+      # Git commands require dynamic argument construction.
+      # Inputs are validated (validateGitRef) and cleaned (filepath.Clean) before use.
+      - path: ^pkg/git/
+        text: "G204: Subprocess launched with a potential tainted input or cmd arguments"
+      - path: ^pkg/git/
+        text: "G204: Subprocess launched with variable"
+      # Test files: white-box testing needed for unexported functions.
+      - path: _test\.go$
+        linters:
+          - testpackage
+          - paralleltest
+          - funlen
+      # Test files: file permissions on temp dirs are not a security concern.
+      - path: _test\.go$
+        text: "G(301|304|306|703):"
+formatters:
+  enable:
+    - gci
+    - gofmt
+    - gofumpt
+    - goimports
+  settings:
+    gofumpt:
+      extra-rules: true
+
+issues:
+  max-same-issues: 0

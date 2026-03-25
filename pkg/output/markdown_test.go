@@ -17,11 +17,13 @@ import (
 func newTestLogger() *logrus.Logger {
 	log := logrus.New()
 	log.SetLevel(logrus.FatalLevel)
+
 	return log
 }
 
-func date(year, month, day int) *time.Time {
-	t := time.Date(year, time.Month(month), day, 0, 0, 0, 0, time.UTC)
+func date(month, day int) *time.Time {
+	t := time.Date(2025, time.Month(month), day, 0, 0, 0, 0, time.UTC)
+
 	return &t
 }
 
@@ -35,14 +37,14 @@ func TestMarkdown(t *testing.T) {
 			name: "single release",
 			releases: []*helm.Release{
 				{
-					ReleaseDate: date(2025, 1, 15),
+					ReleaseDate: date(1, 15),
 					Chart: helm.Chart{
 						APIVersion: "v2",
 						AppVersion: "3.0.0",
 						Name:       "my-chart",
 						Version:    "1.0.0",
 					},
-					Commits: []git.GitCommit{
+					Commits: []git.Commit{
 						{Subject: "feat: add feature A"},
 						{Subject: "fix: resolve bug B"},
 					},
@@ -54,26 +56,26 @@ func TestMarkdown(t *testing.T) {
 			name: "multiple releases",
 			releases: []*helm.Release{
 				{
-					ReleaseDate: date(2025, 1, 10),
+					ReleaseDate: date(1, 10),
 					Chart: helm.Chart{
 						APIVersion: "v2",
 						AppVersion: "2.0.0",
 						Name:       "my-chart",
 						Version:    "1.0.0",
 					},
-					Commits: []git.GitCommit{
+					Commits: []git.Commit{
 						{Subject: "feat: initial release"},
 					},
 				},
 				{
-					ReleaseDate: date(2025, 2, 20),
+					ReleaseDate: date(2, 20),
 					Chart: helm.Chart{
 						APIVersion: "v2",
 						AppVersion: "2.1.0",
 						Name:       "my-chart",
 						Version:    "2.0.0",
 					},
-					Commits: []git.GitCommit{
+					Commits: []git.Commit{
 						{Subject: "feat: new feature"},
 						{Subject: "chore: update deps"},
 					},
@@ -85,7 +87,7 @@ func TestMarkdown(t *testing.T) {
 			name: "deprecated chart",
 			releases: []*helm.Release{
 				{
-					ReleaseDate: date(2025, 3, 1),
+					ReleaseDate: date(3, 1),
 					Chart: helm.Chart{
 						APIVersion: "v2",
 						AppVersion: "1.0.0",
@@ -93,7 +95,7 @@ func TestMarkdown(t *testing.T) {
 						Version:    "1.0.0",
 						Deprecated: true,
 					},
-					Commits: []git.GitCommit{
+					Commits: []git.Commit{
 						{Subject: "chore: deprecate chart"},
 					},
 				},
@@ -104,14 +106,14 @@ func TestMarkdown(t *testing.T) {
 			name: "with value diffs",
 			releases: []*helm.Release{
 				{
-					ReleaseDate: date(2025, 1, 1),
+					ReleaseDate: date(1, 1),
 					Chart: helm.Chart{
 						APIVersion: "v2",
 						AppVersion: "1.0.0",
 						Name:       "my-chart",
 						Version:    "1.0.0",
 					},
-					Commits: []git.GitCommit{
+					Commits: []git.Commit{
 						{Subject: "feat: initial"},
 					},
 					ValueDiff: "- old: value\n+ new: value\n",
@@ -123,14 +125,14 @@ func TestMarkdown(t *testing.T) {
 			name: "unreleased commits",
 			releases: []*helm.Release{
 				{
-					ReleaseDate: date(2025, 1, 1),
+					ReleaseDate: date(1, 1),
 					Chart: helm.Chart{
 						APIVersion: "v2",
 						AppVersion: "1.0.0",
 						Name:       "my-chart",
 						Version:    "1.0.0",
 					},
-					Commits: []git.GitCommit{
+					Commits: []git.Commit{
 						{Subject: "feat: released feature"},
 					},
 				},
@@ -142,7 +144,7 @@ func TestMarkdown(t *testing.T) {
 						Name:       "my-chart",
 						Version:    "Next Release",
 					},
-					Commits: []git.GitCommit{
+					Commits: []git.Commit{
 						{Subject: "feat: work in progress"},
 					},
 				},
@@ -153,14 +155,14 @@ func TestMarkdown(t *testing.T) {
 			name: "helm v1 api version",
 			releases: []*helm.Release{
 				{
-					ReleaseDate: date(2025, 1, 1),
+					ReleaseDate: date(1, 1),
 					Chart: helm.Chart{
 						APIVersion: "v1",
 						AppVersion: "1.0.0",
 						Name:       "legacy-chart",
 						Version:    "1.0.0",
 					},
-					Commits: []git.GitCommit{
+					Commits: []git.Commit{
 						{Subject: "feat: legacy feature"},
 					},
 				},
@@ -171,13 +173,13 @@ func TestMarkdown(t *testing.T) {
 			name: "no api version",
 			releases: []*helm.Release{
 				{
-					ReleaseDate: date(2025, 1, 1),
+					ReleaseDate: date(1, 1),
 					Chart: helm.Chart{
 						AppVersion: "1.0.0",
 						Name:       "ancient-chart",
 						Version:    "1.0.0",
 					},
-					Commits: []git.GitCommit{
+					Commits: []git.Commit{
 						{Subject: "feat: ancient feature"},
 					},
 				},
@@ -188,7 +190,7 @@ func TestMarkdown(t *testing.T) {
 			name: "with kube version",
 			releases: []*helm.Release{
 				{
-					ReleaseDate: date(2025, 1, 1),
+					ReleaseDate: date(1, 1),
 					Chart: helm.Chart{
 						APIVersion:  "v2",
 						AppVersion:  "1.0.0",
@@ -196,7 +198,7 @@ func TestMarkdown(t *testing.T) {
 						Name:        "my-chart",
 						Version:     "1.0.0",
 					},
-					Commits: []git.GitCommit{
+					Commits: []git.Commit{
 						{Subject: "feat: add feature"},
 					},
 				},

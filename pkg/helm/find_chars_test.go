@@ -32,6 +32,7 @@ func TestFindCharts(t *testing.T) {
 			name: "nested charts",
 			setup: func(t *testing.T, dir string) {
 				t.Helper()
+
 				charts := []string{
 					filepath.Join(dir, "chart-a", "Chart.yaml"),
 					filepath.Join(dir, "chart-b", "Chart.yaml"),

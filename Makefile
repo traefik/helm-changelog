@@ -29,8 +29,8 @@ clean: ## clean up created files
 
 all: test build image ## Runs test, build and docker
 
-lint: ## Run golint
-	golint ./...
+lint: ## Run golangci-lint
+	golangci-lint run ./...
 
 update-docs: build ## Upgrade automatic documentations
 	bash hack/update-readme.sh

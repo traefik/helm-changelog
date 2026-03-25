@@ -85,6 +85,7 @@ version: 2.0.0`,
 
 			if tt.expectError {
 				require.Error(t, err)
+
 				return
 			}
 

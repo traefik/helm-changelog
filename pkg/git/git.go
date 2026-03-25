@@ -2,113 +2,168 @@ package git
 
 import (
 	"bytes"
+	"context"
 	"errors"
+	"fmt"
 	"io"
 	"os/exec"
+	"path/filepath"
+	"regexp"
 	"strings"
 
 	"github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v3"
 )
 
+var (
+	gitRefPattern = regexp.MustCompile(`^[a-zA-Z0-9_./:^~\-]+$`)
+
+	// ErrInvalidGitRef indicates a git ref contains unexpected characters.
+	ErrInvalidGitRef = errors.New("invalid git ref")
+)
+
+// Git wraps git CLI operations.
 type Git struct {
 	Log *logrus.Logger
 }
 
-func (g *Git) FindGitRepositoryRoot() (string, error) {
-	cmd := exec.Command("git", "rev-parse", "--show-toplevel")
+// FindGitRepositoryRoot returns the absolute path to the root of the git repository.
+func (g *Git) FindGitRepositoryRoot(ctx context.Context) (string, error) {
+	cmd := exec.CommandContext(ctx, "git", "rev-parse", "--show-toplevel")
 	g.Log.Debugln(cmd)
 
 	out, err := cmd.Output()
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("finding git root: %w", err)
 	}
 
 	g.Log.Debugf("Result: %s", out)
+
 	return strings.TrimSpace(string(out)), nil
 }
 
-func (g *Git) GetFileContent(hash, filePath string) (string, error) {
-	cmd := exec.Command("git", "cat-file", "-p", hash+":"+filePath)
-	g.Log.Debugln(cmd)
-
-	out, err := cmd.Output()
+// GetFileContent returns the content of a file at a specific git revision.
+func (g *Git) GetFileContent(ctx context.Context, hash, filePath string) (string, error) {
+	err := validateGitRef(hash)
 	if err != nil {
 		return "", err
 	}
 
+	cleanPath := filepath.Clean(filePath)
+
+	cmd := exec.CommandContext(ctx, "git", "cat-file", "-p", hash+":"+cleanPath)
+	g.Log.Debugln(cmd)
+
+	out, err := cmd.Output()
+	if err != nil {
+		return "", fmt.Errorf("getting file %s at %s: %w", cleanPath, hash, err)
+	}
+
 	g.Log.Debugf("Result: %s", out)
+
 	return string(out), nil
 }
 
-func (g *Git) GetAllCommits(chartPath string) ([]GitCommit, error) {
-	cmd := exec.Command(
+// GetAllCommits returns all git commits affecting the given chart path.
+func (g *Git) GetAllCommits(ctx context.Context, chartPath string) ([]Commit, error) {
+	cleanPath := filepath.Clean(chartPath)
+
+	cmd := exec.CommandContext(ctx,
 		"git",
 		"log",
 		"--date=iso-strict",
 		"--reverse",
 		gitformat,
 		"--",
-		chartPath,
-		":(exclude)"+chartPath+"/Changelog.md",
-	)
-	g.Log.Debugln(cmd)
-
-	out, err := cmd.Output()
-	if err != nil || len(out) == 0 {
-		return []GitCommit{}, err
-	}
-
-	g.Log.Debugf("Result: %s", out)
-
-	gitCommitList := []GitCommit{}
-	dec := yaml.NewDecoder(bytes.NewReader(out))
-
-	for {
-		// create new GitCommit here
-		t := new(GitCommit)
-		// pass a reference to GitCommit reference
-		err := dec.Decode(&t)
-		if t == nil {
-			continue
-		}
-
-		// break the loop in case of EOF
-		if errors.Is(err, io.EOF) {
-			break
-		}
-
-		if err != nil {
-			g.Log.Error(err)
-			continue
-		}
-
-		g.Log.Debugf("commit: %s %s", t.Commit, t.Subject)
-		gitCommitList = append(gitCommitList, *t)
-	}
-
-	return gitCommitList, nil
-}
-
-func (g *Git) GetDiffBetweenCommits(start, end, diffPath string) (string, error) {
-	if start == end {
-		return "", nil
-	}
-	cmd := exec.Command(
-		"git",
-		"--no-pager",
-		"diff",
-		start+"..."+end,
-		"--",
-		diffPath,
+		cleanPath,
+		":(exclude)"+cleanPath+"/Changelog.md",
 	)
 	g.Log.Debugln(cmd)
 
 	out, err := cmd.Output()
 	if err != nil {
-		return "err", err
+		return nil, fmt.Errorf("getting commits for %s: %w", cleanPath, err)
+	}
+
+	if len(out) == 0 {
+		return nil, nil
 	}
 
 	g.Log.Debugf("Result: %s", out)
+
+	var commits []Commit
+
+	dec := yaml.NewDecoder(bytes.NewReader(out))
+
+	for {
+		t := new(Commit)
+
+		decErr := dec.Decode(&t)
+
+		if t == nil {
+			continue
+		}
+
+		if errors.Is(decErr, io.EOF) {
+			break
+		}
+
+		if decErr != nil {
+			g.Log.Error(decErr)
+
+			continue
+		}
+
+		g.Log.Debugf("commit: %s %s", t.Hash, t.Subject)
+
+		commits = append(commits, *t)
+	}
+
+	return commits, nil
+}
+
+// GetDiffBetweenCommits returns the diff of a file between two commits.
+func (g *Git) GetDiffBetweenCommits(ctx context.Context, start, end, diffPath string) (string, error) {
+	if start == end {
+		return "", nil
+	}
+
+	err := validateGitRef(start)
+	if err != nil {
+		return "", err
+	}
+
+	err = validateGitRef(end)
+	if err != nil {
+		return "", err
+	}
+
+	cleanPath := filepath.Clean(diffPath)
+
+	cmd := exec.CommandContext(ctx,
+		"git",
+		"--no-pager",
+		"diff",
+		start+"..."+end,
+		"--",
+		cleanPath,
+	)
+	g.Log.Debugln(cmd)
+
+	out, err := cmd.Output()
+	if err != nil {
+		return "", fmt.Errorf("getting diff between %s and %s: %w", start, end, err)
+	}
+
+	g.Log.Debugf("Result: %s", out)
+
 	return string(out), nil
+}
+
+func validateGitRef(ref string) error {
+	if !gitRefPattern.MatchString(ref) {
+		return fmt.Errorf("%w: %q", ErrInvalidGitRef, ref)
+	}
+
+	return nil
 }
