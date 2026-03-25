@@ -47,8 +47,11 @@ func Execute() {
 
 	err := app.Run(context.Background(), os.Args)
 	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
+		log := zerolog.New(zerolog.ConsoleWriter{Out: os.Stderr}).
+			With().
+			Timestamp().
+			Logger()
+		log.Fatal().Err(err).Msg("")
 	}
 }
 
