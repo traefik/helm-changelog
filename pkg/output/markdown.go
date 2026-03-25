@@ -17,7 +17,7 @@ import (
 const changeLogHeader = "# Change Log\n\n"
 
 // Markdown creates a markdown representation of the changelog at the changeLogFilePath path.
-func Markdown(log *zerolog.Logger, changeLogFilePath string, releases []*helm.Release, latestOnly bool) {
+func Markdown(log *zerolog.Logger, changeLogFilePath string, releases []*helm.Release, update bool) {
 	for _, release := range releases {
 		slices.Reverse(release.Commits)
 	}
@@ -26,7 +26,7 @@ func Markdown(log *zerolog.Logger, changeLogFilePath string, releases []*helm.Re
 
 	log.Debug().Msgf("Creating changelog file: %s", changeLogFilePath)
 
-	if latestOnly && len(releases) > 0 {
+	if update && len(releases) > 0 {
 		writeLatestOnly(log, changeLogFilePath, releases[0])
 
 		return

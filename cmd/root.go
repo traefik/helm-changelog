@@ -34,9 +34,9 @@ func Execute() {
 				Usage:   "Log level (trace, debug, info, warn, error, fatal, panic)",
 			},
 			&cli.BoolFlag{
-				Name:    "latest-only",
-				Aliases: []string{"l"},
-				Usage:   "Only generate changelog for the latest version",
+				Name:    "update",
+				Aliases: []string{"u"},
+				Usage:   "Prepend the latest release to the existing changelog without overwriting previous entries",
 			},
 		},
 		Before: func(ctx context.Context, cmd *cli.Command) (context.Context, error) {
@@ -63,7 +63,7 @@ func Execute() {
 func run(ctx context.Context, cmd *cli.Command) error {
 	log := zerolog.Ctx(ctx)
 	changelogFilename := cmd.String("filename")
-	latestOnly := cmd.Bool("latest-only")
+	update := cmd.Bool("update")
 
 	currentDir, err := os.Getwd()
 	if err != nil {
@@ -100,7 +100,7 @@ func run(ctx context.Context, cmd *cli.Command) error {
 		releases := helm.CreateHelmReleases(ctx, log, chartFile, relativeChartDir, g, allCommits)
 
 		changeLogFilePath := filepath.Join(fullChartDir, changelogFilename)
-		output.Markdown(log, changeLogFilePath, releases, latestOnly)
+		output.Markdown(log, changeLogFilePath, releases, update)
 	}
 
 	return nil

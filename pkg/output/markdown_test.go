@@ -28,10 +28,10 @@ func date(month, day int) *time.Time {
 
 func TestMarkdown(t *testing.T) {
 	tests := []struct {
-		name       string
-		releases   []*helm.Release
-		latestOnly bool
-		golden     string
+		name     string
+		releases []*helm.Release
+		update   bool
+		golden   string
 	}{
 		{
 			name: "single release",
@@ -212,7 +212,7 @@ func TestMarkdown(t *testing.T) {
 			dir := t.TempDir()
 			outPath := filepath.Join(dir, "Changelog.md")
 
-			Markdown(newTestLogger(), outPath, tt.releases, tt.latestOnly)
+			Markdown(newTestLogger(), outPath, tt.releases, tt.update)
 
 			got, err := os.ReadFile(outPath)
 			require.NoError(t, err)
@@ -230,7 +230,7 @@ func TestMarkdown(t *testing.T) {
 	}
 }
 
-func TestMarkdown_LatestOnly(t *testing.T) {
+func TestMarkdown_Update(t *testing.T) {
 	existingChangelog, err := os.ReadFile("testdata/existing_changelog.md")
 	require.NoError(t, err)
 
@@ -239,7 +239,7 @@ func TestMarkdown_LatestOnly(t *testing.T) {
 
 	require.NoError(t, os.WriteFile(outPath, existingChangelog, 0o644))
 
-	// Now generate with latestOnly=true, adding v2.0.0.
+	// Now generate with update=true, adding v2.0.0.
 	releases := []*helm.Release{
 		{
 			ReleaseDate: date(1, 10),
