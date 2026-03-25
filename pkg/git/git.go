@@ -11,7 +11,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/sirupsen/logrus"
+	"github.com/rs/zerolog"
 	"go.yaml.in/yaml/v4"
 )
 
@@ -24,20 +24,20 @@ var (
 
 // Git wraps git CLI operations.
 type Git struct {
-	Log *logrus.Logger
+	Log *zerolog.Logger
 }
 
 // FindGitRepositoryRoot returns the absolute path to the root of the git repository.
 func (g *Git) FindGitRepositoryRoot(ctx context.Context) (string, error) {
 	cmd := exec.CommandContext(ctx, "git", "rev-parse", "--show-toplevel")
-	g.Log.Debugln(cmd)
+	g.Log.Debug().Msgf("%s", cmd)
 
 	out, err := cmd.Output()
 	if err != nil {
 		return "", fmt.Errorf("finding git root: %w", err)
 	}
 
-	g.Log.Debugf("Result: %s", out)
+	g.Log.Debug().Msgf("Result: %s", out)
 
 	return strings.TrimSpace(string(out)), nil
 }
@@ -52,14 +52,14 @@ func (g *Git) GetFileContent(ctx context.Context, hash, filePath string) (string
 	cleanPath := filepath.Clean(filePath)
 
 	cmd := exec.CommandContext(ctx, "git", "cat-file", "-p", hash+":"+cleanPath)
-	g.Log.Debugln(cmd)
+	g.Log.Debug().Msgf("%s", cmd)
 
 	out, err := cmd.Output()
 	if err != nil {
 		return "", fmt.Errorf("getting file %s at %s: %w", cleanPath, hash, err)
 	}
 
-	g.Log.Debugf("Result: %s", out)
+	g.Log.Debug().Msgf("Result: %s", out)
 
 	return string(out), nil
 }
@@ -78,7 +78,7 @@ func (g *Git) GetAllCommits(ctx context.Context, chartPath string) ([]Commit, er
 		cleanPath,
 		":(exclude)"+cleanPath+"/Changelog.md",
 	)
-	g.Log.Debugln(cmd)
+	g.Log.Debug().Msgf("%s", cmd)
 
 	out, err := cmd.Output()
 	if err != nil {
@@ -89,7 +89,7 @@ func (g *Git) GetAllCommits(ctx context.Context, chartPath string) ([]Commit, er
 		return nil, nil
 	}
 
-	g.Log.Debugf("Result: %s", out)
+	g.Log.Debug().Msgf("Result: %s", out)
 
 	var commits []Commit
 
@@ -109,12 +109,12 @@ func (g *Git) GetAllCommits(ctx context.Context, chartPath string) ([]Commit, er
 		}
 
 		if decErr != nil {
-			g.Log.Error(decErr)
+			g.Log.Error().Err(decErr).Msg("failed to decode commit")
 
 			continue
 		}
 
-		g.Log.Debugf("commit: %s %s", t.Hash, t.Subject)
+		g.Log.Debug().Msgf("commit: %s %s", t.Hash, t.Subject)
 
 		commits = append(commits, *t)
 	}
@@ -148,14 +148,14 @@ func (g *Git) GetDiffBetweenCommits(ctx context.Context, start, end, diffPath st
 		"--",
 		cleanPath,
 	)
-	g.Log.Debugln(cmd)
+	g.Log.Debug().Msgf("%s", cmd)
 
 	out, err := cmd.Output()
 	if err != nil {
 		return "", fmt.Errorf("getting diff between %s and %s: %w", start, end, err)
 	}
 
-	g.Log.Debugf("Result: %s", out)
+	g.Log.Debug().Msgf("Result: %s", out)
 
 	return string(out), nil
 }

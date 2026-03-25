@@ -4,12 +4,11 @@ package cmd
 import (
 	"context"
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 	"strings"
 
-	"github.com/sirupsen/logrus"
+	"github.com/rs/zerolog"
 	"github.com/spf13/cobra"
 	"github.com/traefik/helm-changelog/pkg/git"
 	"github.com/traefik/helm-changelog/pkg/helm"
@@ -24,29 +23,29 @@ var rootCmd = &cobra.Command{
 	Short: "Create changelogs for Helm Charts, based on git history",
 	Run: func(_ *cobra.Command, _ []string) {
 		ctx := context.Background()
-		log := logrus.StandardLogger()
+		log := zerolog.Ctx(ctx)
 
 		currentDir, err := os.Getwd()
 		if err != nil {
-			log.Fatal(err)
+			log.Fatal().Err(err).Msg("failed to get working directory")
 		}
 
 		g := &git.Git{Log: log}
 
 		gitBaseDir, err := g.FindGitRepositoryRoot(ctx)
 		if err != nil {
-			log.Fatalf(
+			log.Fatal().Msg(
 				"Could not determine git root directory. helm-changelog depends largely on git history.",
 			)
 		}
 
 		fileList, err := helm.FindCharts(currentDir)
 		if err != nil {
-			log.Fatal(err)
+			log.Fatal().Err(err).Msg("failed to find charts")
 		}
 
 		for _, chartFileFullPath := range fileList {
-			log.Infof("Handling: %s\n", chartFileFullPath)
+			log.Info().Msgf("Handling: %s", chartFileFullPath)
 
 			fullChartDir := filepath.Dir(chartFileFullPath)
 			chartFile := strings.TrimPrefix(chartFileFullPath, gitBaseDir+"/")
@@ -55,7 +54,7 @@ var rootCmd = &cobra.Command{
 
 			allCommits, err := g.GetAllCommits(ctx, fullChartDir)
 			if err != nil {
-				log.Fatal(err)
+				log.Fatal().Err(err).Msg("failed to get commits")
 			}
 
 			releases := helm.CreateHelmReleases(ctx, log, chartFile, relativeChartDir, g, allCommits)
@@ -71,11 +70,14 @@ var rootCmd = &cobra.Command{
 func Execute() {
 	var v string
 
-	rootCmd.PersistentPreRunE = func(_ *cobra.Command, _ []string) error {
-		err := setUpLogs(os.Stdout, v)
+	rootCmd.PersistentPreRunE = func(cmd *cobra.Command, _ []string) error {
+		log, err := setUpLogs(v)
 		if err != nil {
 			return err
 		}
+
+		ctx := log.WithContext(cmd.Context())
+		cmd.SetContext(ctx)
 
 		return nil
 	}
@@ -84,23 +86,25 @@ func Execute() {
 		&changelogFilename, "filename", "f", "Changelog.md", "Filename for changelog",
 	)
 	rootCmd.PersistentFlags().StringVarP(
-		&v, "verbosity", "v", logrus.WarnLevel.String(),
-		"Log level (debug, info, warn, error, fatal, panic)",
+		&v, "verbosity", "v", zerolog.WarnLevel.String(),
+		"Log level (trace, debug, info, warn, error, fatal, panic)",
 	)
 
 	cobra.CheckErr(rootCmd.Execute())
 }
 
-// setUpLogs sets the log output and the log level.
-func setUpLogs(out io.Writer, level string) error {
-	logrus.SetOutput(out)
-
-	lvl, err := logrus.ParseLevel(level)
+// setUpLogs configures a zerolog logger and returns it.
+func setUpLogs(level string) (zerolog.Logger, error) {
+	lvl, err := zerolog.ParseLevel(level)
 	if err != nil {
-		return fmt.Errorf("parsing log level: %w", err)
+		return zerolog.Logger{}, fmt.Errorf("parsing log level: %w", err)
 	}
 
-	logrus.SetLevel(lvl)
+	log := zerolog.New(zerolog.ConsoleWriter{Out: os.Stdout}).
+		Level(lvl).
+		With().
+		Timestamp().
+		Logger()
 
-	return nil
+	return log, nil
 }

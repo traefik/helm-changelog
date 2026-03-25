@@ -8,17 +8,16 @@ import (
 	"testing"
 	"time"
 
-	"github.com/sirupsen/logrus"
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/traefik/helm-changelog/pkg/git"
 )
 
-func newTestLogger() *logrus.Logger {
-	log := logrus.New()
-	log.SetLevel(logrus.FatalLevel)
+func newTestLogger() *zerolog.Logger {
+	nop := zerolog.Nop()
 
-	return log
+	return &nop
 }
 
 func makeCommit(hash, subject string) git.Commit {
