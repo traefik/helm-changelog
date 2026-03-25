@@ -28,9 +28,10 @@ func date(month, day int) *time.Time {
 
 func TestMarkdown(t *testing.T) {
 	tests := []struct {
-		name     string
-		releases []*helm.Release
-		golden   string
+		name       string
+		releases   []*helm.Release
+		latestOnly bool
+		golden     string
 	}{
 		{
 			name: "single release",
@@ -204,6 +205,38 @@ func TestMarkdown(t *testing.T) {
 			},
 			golden: "testdata/with_kube_version.md",
 		},
+		{
+			name: "latest only with multiple releases",
+			releases: []*helm.Release{
+				{
+					ReleaseDate: date(1, 10),
+					Chart: helm.Chart{
+						APIVersion: "v2",
+						AppVersion: "2.0.0",
+						Name:       "my-chart",
+						Version:    "1.0.0",
+					},
+					Commits: []git.Commit{
+						{Subject: "feat: initial release"},
+					},
+				},
+				{
+					ReleaseDate: date(2, 20),
+					Chart: helm.Chart{
+						APIVersion: "v2",
+						AppVersion: "2.1.0",
+						Name:       "my-chart",
+						Version:    "2.0.0",
+					},
+					Commits: []git.Commit{
+						{Subject: "feat: new feature"},
+						{Subject: "chore: update deps"},
+					},
+				},
+			},
+			latestOnly: true,
+			golden:     "testdata/latest_only.md",
+		},
 	}
 
 	for _, tt := range tests {
@@ -211,7 +244,7 @@ func TestMarkdown(t *testing.T) {
 			dir := t.TempDir()
 			outPath := filepath.Join(dir, "Changelog.md")
 
-			Markdown(newTestLogger(), outPath, tt.releases)
+			Markdown(newTestLogger(), outPath, tt.releases, tt.latestOnly)
 
 			got, err := os.ReadFile(outPath)
 			require.NoError(t, err)
