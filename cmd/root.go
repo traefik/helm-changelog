@@ -1,6 +1,9 @@
+// Package cmd provides the CLI commands for helm-changelog.
 package cmd
 
 import (
+	"context"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -15,11 +18,12 @@ import (
 
 var changelogFilename string
 
-// rootCmd represents the base command when called without any subcommands
+// rootCmd represents the base command when called without any subcommands.
 var rootCmd = &cobra.Command{
 	Use:   "helm-changelog",
 	Short: "Create changelogs for Helm Charts, based on git history",
-	Run: func(cmd *cobra.Command, args []string) {
+	Run: func(_ *cobra.Command, _ []string) {
+		ctx := context.Background()
 		log := logrus.StandardLogger()
 
 		currentDir, err := os.Getwd()
@@ -29,9 +33,11 @@ var rootCmd = &cobra.Command{
 
 		g := &git.Git{Log: log}
 
-		gitBaseDir, err := g.FindGitRepositoryRoot()
+		gitBaseDir, err := g.FindGitRepositoryRoot(ctx)
 		if err != nil {
-			log.Fatalf("Could not determine git root directory. helm-changelog depends largely on git history.")
+			log.Fatalf(
+				"Could not determine git root directory. helm-changelog depends largely on git history.",
+			)
 		}
 
 		fileList, err := helm.FindCharts(currentDir)
@@ -47,12 +53,12 @@ var rootCmd = &cobra.Command{
 			relativeChartFile := strings.TrimPrefix(chartFileFullPath, currentDir+"/")
 			relativeChartDir := filepath.Dir(relativeChartFile)
 
-			allCommits, err := g.GetAllCommits(fullChartDir)
+			allCommits, err := g.GetAllCommits(ctx, fullChartDir)
 			if err != nil {
 				log.Fatal(err)
 			}
 
-			releases := helm.CreateHelmReleases(log, chartFile, relativeChartDir, g, allCommits)
+			releases := helm.CreateHelmReleases(ctx, log, chartFile, relativeChartDir, g, allCommits)
 
 			changeLogFilePath := filepath.Join(fullChartDir, changelogFilename)
 			output.Markdown(log, changeLogFilePath, releases)
@@ -65,26 +71,36 @@ var rootCmd = &cobra.Command{
 func Execute() {
 	var v string
 
-	rootCmd.PersistentPreRunE = func(cmd *cobra.Command, args []string) error {
-		if err := setUpLogs(os.Stdout, v); err != nil {
+	rootCmd.PersistentPreRunE = func(_ *cobra.Command, _ []string) error {
+		err := setUpLogs(os.Stdout, v)
+		if err != nil {
 			return err
 		}
+
 		return nil
 	}
 
-	rootCmd.PersistentFlags().StringVarP(&changelogFilename, "filename", "f", "Changelog.md", "Filename for changelog")
-	rootCmd.PersistentFlags().StringVarP(&v, "verbosity", "v", logrus.WarnLevel.String(), "Log level (debug, info, warn, error, fatal, panic)")
+	rootCmd.PersistentFlags().StringVarP(
+		&changelogFilename, "filename", "f", "Changelog.md", "Filename for changelog",
+	)
+	rootCmd.PersistentFlags().StringVarP(
+		&v, "verbosity", "v", logrus.WarnLevel.String(),
+		"Log level (debug, info, warn, error, fatal, panic)",
+	)
 
 	cobra.CheckErr(rootCmd.Execute())
 }
 
-// setUpLogs set the log output ans the log level
+// setUpLogs sets the log output and the log level.
 func setUpLogs(out io.Writer, level string) error {
 	logrus.SetOutput(out)
+
 	lvl, err := logrus.ParseLevel(level)
 	if err != nil {
-		return err
+		return fmt.Errorf("parsing log level: %w", err)
 	}
+
 	logrus.SetLevel(lvl)
+
 	return nil
 }

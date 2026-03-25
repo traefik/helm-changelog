@@ -3,6 +3,7 @@
 package helm
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -24,7 +25,7 @@ func newGitClientMock(tb testing.TB) *gitClientMock {
 	return m
 }
 
-func (_m *gitClientMock) GetDiffBetweenCommits(start string, end string, diffPath string) (string, error) {
+func (_m *gitClientMock) GetDiffBetweenCommits(_ context.Context, start string, end string, diffPath string) (string, error) {
 	_ret := _m.Called(start, end, diffPath)
 
 	if _rf, ok := _ret.Get(0).(func(string, string, string) (string, error)); ok {
@@ -126,7 +127,7 @@ func (_c *gitClientGetDiffBetweenCommitsCall) OnGetFileContentRaw(hash interface
 	return _c.Parent.OnGetFileContentRaw(hash, filePath)
 }
 
-func (_m *gitClientMock) GetFileContent(hash string, filePath string) (string, error) {
+func (_m *gitClientMock) GetFileContent(_ context.Context, hash string, filePath string) (string, error) {
 	_ret := _m.Called(hash, filePath)
 
 	if _rf, ok := _ret.Get(0).(func(string, string) (string, error)); ok {

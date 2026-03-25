@@ -1,6 +1,7 @@
 package helm
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"path/filepath"
@@ -16,48 +17,49 @@ import (
 func newTestLogger() *logrus.Logger {
 	log := logrus.New()
 	log.SetLevel(logrus.FatalLevel)
+
 	return log
 }
 
-func makeCommit(hash, subject string) git.GitCommit {
+func makeCommit(hash, subject string) git.Commit {
 	now := time.Now()
-	return git.GitCommit{
-		Commit:  hash,
+
+	return git.Commit{
+		Hash:    hash,
 		Subject: subject,
-		Author:  git.GitPerson{Name: "test", Email: "test@test.com", Date: &now},
+		Author:  git.Person{Name: "test", Email: "test@test.com", Date: &now},
 	}
 }
 
-func chartYAML(name, version string) string {
-	return fmt.Sprintf("apiVersion: v2\nname: %s\nversion: %s\n", name, version)
+func chartYAML(version string) string {
+	return fmt.Sprintf("apiVersion: v2\nname: my-chart\nversion: %s\n", version)
 }
 
 var (
-	chartFile  = filepath.Join("charts", "Chart.yaml")
-	valuesFile = filepath.Join("charts", "values.yaml")
+	errNotFound = errors.New("not found")
+	chartFile   = filepath.Join("charts", "Chart.yaml")
+	valuesFile  = filepath.Join("charts", "values.yaml")
 )
 
 func TestCreateHelmReleases_SingleRelease(t *testing.T) {
 	g := newGitClientMock(t)
 	log := newTestLogger()
+	ctx := context.Background()
 
-	commits := []git.GitCommit{
+	commits := []git.Commit{
 		makeCommit("aaa", "initial work"),
 		makeCommit("bbb", "bump version"),
 	}
 
-	// aaa: Chart.yaml not found yet
 	g.OnGetFileContent("aaa", chartFile).
-		TypedReturns("", errors.New("not found")).Once()
-	// bbb: version 1.0.0 → creates release with [aaa, bbb]
+		TypedReturns("", errNotFound).Once()
 	g.OnGetFileContent("bbb", chartFile).
-		TypedReturns(chartYAML("my-chart", "1.0.0"), nil).Once()
+		TypedReturns(chartYAML("1.0.0"), nil).Once()
 
-	// createValueDiffs: first release gets file content
 	g.OnGetFileContent("aaa", valuesFile).
 		TypedReturns("key: val", nil).Once()
 
-	releases := CreateHelmReleases(log, chartFile, "charts", g, commits)
+	releases := CreateHelmReleases(ctx, log, chartFile, "charts", g, commits)
 
 	require.Len(t, releases, 1)
 	assert.Equal(t, "1.0.0", releases[0].Chart.Version)
@@ -68,24 +70,24 @@ func TestCreateHelmReleases_SingleRelease(t *testing.T) {
 func TestCreateHelmReleases_MultipleReleases(t *testing.T) {
 	g := newGitClientMock(t)
 	log := newTestLogger()
+	ctx := context.Background()
 
-	commits := []git.GitCommit{
+	commits := []git.Commit{
 		makeCommit("aaa", "initial"),
 		makeCommit("bbb", "bump to 2.0.0"),
 	}
 
 	g.OnGetFileContent("aaa", chartFile).
-		TypedReturns(chartYAML("my-chart", "1.0.0"), nil).Once()
+		TypedReturns(chartYAML("1.0.0"), nil).Once()
 	g.OnGetFileContent("bbb", chartFile).
-		TypedReturns(chartYAML("my-chart", "2.0.0"), nil).Once()
+		TypedReturns(chartYAML("2.0.0"), nil).Once()
 
-	// createValueDiffs: first release gets file content, second gets diff
 	g.OnGetFileContent("aaa", valuesFile).
 		TypedReturns("key: val1", nil).Once()
 	g.OnGetDiffBetweenCommits("aaa", "bbb", valuesFile).
 		TypedReturns("- old\n+ new", nil).Once()
 
-	releases := CreateHelmReleases(log, chartFile, "charts", g, commits)
+	releases := CreateHelmReleases(ctx, log, chartFile, "charts", g, commits)
 
 	require.Len(t, releases, 2)
 	assert.Equal(t, "1.0.0", releases[0].Chart.Version)
@@ -99,29 +101,26 @@ func TestCreateHelmReleases_MultipleReleases(t *testing.T) {
 func TestCreateHelmReleases_UnreleasedCommits(t *testing.T) {
 	g := newGitClientMock(t)
 	log := newTestLogger()
+	ctx := context.Background()
 
-	commits := []git.GitCommit{
+	commits := []git.Commit{
 		makeCommit("aaa", "released"),
 		makeCommit("bbb", "unreleased change"),
 	}
 
-	// aaa creates version 1.0.0
 	g.OnGetFileContent("aaa", chartFile).
-		TypedReturns(chartYAML("my-chart", "1.0.0"), nil).Once()
-	// bbb has same version → stays unreleased
+		TypedReturns(chartYAML("1.0.0"), nil).Once()
 	g.OnGetFileContent("bbb", chartFile).
-		TypedReturns(chartYAML("my-chart", "1.0.0"), nil).Once()
-	// HEAD check for unreleased commits
+		TypedReturns(chartYAML("1.0.0"), nil).Once()
 	g.OnGetFileContent("HEAD", chartFile).
-		TypedReturns(chartYAML("my-chart", "1.0.0"), nil).Once()
+		TypedReturns(chartYAML("1.0.0"), nil).Once()
 
-	// createValueDiffs
 	g.OnGetFileContent("aaa", valuesFile).
 		TypedReturns("key: val", nil).Once()
 	g.OnGetDiffBetweenCommits("aaa", "bbb", valuesFile).
 		TypedReturns("", nil).Once()
 
-	releases := CreateHelmReleases(log, chartFile, "charts", g, commits)
+	releases := CreateHelmReleases(ctx, log, chartFile, "charts", g, commits)
 
 	require.Len(t, releases, 2)
 	assert.Equal(t, "1.0.0", releases[0].Chart.Version)
@@ -132,22 +131,22 @@ func TestCreateHelmReleases_UnreleasedCommits(t *testing.T) {
 func TestCreateHelmReleases_ChartNotFoundInCommit(t *testing.T) {
 	g := newGitClientMock(t)
 	log := newTestLogger()
+	ctx := context.Background()
 
-	commits := []git.GitCommit{
+	commits := []git.Commit{
 		makeCommit("aaa", "no chart here"),
 		makeCommit("bbb", "has chart"),
 	}
 
 	g.OnGetFileContent("aaa", chartFile).
-		TypedReturns("", errors.New("not found")).Once()
+		TypedReturns("", errNotFound).Once()
 	g.OnGetFileContent("bbb", chartFile).
-		TypedReturns(chartYAML("my-chart", "1.0.0"), nil).Once()
+		TypedReturns(chartYAML("1.0.0"), nil).Once()
 
-	// createValueDiffs
 	g.OnGetFileContent("aaa", valuesFile).
-		TypedReturns("", errors.New("not found")).Once()
+		TypedReturns("", errNotFound).Once()
 
-	releases := CreateHelmReleases(log, chartFile, "charts", g, commits)
+	releases := CreateHelmReleases(ctx, log, chartFile, "charts", g, commits)
 
 	require.Len(t, releases, 1)
 	assert.Equal(t, "1.0.0", releases[0].Chart.Version)
@@ -157,8 +156,9 @@ func TestCreateHelmReleases_ChartNotFoundInCommit(t *testing.T) {
 func TestCreateHelmReleases_EmptyCommits(t *testing.T) {
 	g := newGitClientMock(t)
 	log := newTestLogger()
+	ctx := context.Background()
 
-	releases := CreateHelmReleases(log, chartFile, "charts", g, []git.GitCommit{})
+	releases := CreateHelmReleases(ctx, log, chartFile, "charts", g, []git.Commit{})
 
 	assert.Empty(t, releases)
 }
@@ -166,8 +166,9 @@ func TestCreateHelmReleases_EmptyCommits(t *testing.T) {
 func TestCreateHelmReleases_InvalidChartYAML(t *testing.T) {
 	g := newGitClientMock(t)
 	log := newTestLogger()
+	ctx := context.Background()
 
-	commits := []git.GitCommit{
+	commits := []git.Commit{
 		makeCommit("aaa", "bad chart"),
 		makeCommit("bbb", "good chart"),
 	}
@@ -175,13 +176,12 @@ func TestCreateHelmReleases_InvalidChartYAML(t *testing.T) {
 	g.OnGetFileContent("aaa", chartFile).
 		TypedReturns("{{{invalid", nil).Once()
 	g.OnGetFileContent("bbb", chartFile).
-		TypedReturns(chartYAML("my-chart", "1.0.0"), nil).Once()
+		TypedReturns(chartYAML("1.0.0"), nil).Once()
 
-	// createValueDiffs
 	g.OnGetFileContent("aaa", valuesFile).
-		TypedReturns("", errors.New("not found")).Once()
+		TypedReturns("", errNotFound).Once()
 
-	releases := CreateHelmReleases(log, chartFile, "charts", g, commits)
+	releases := CreateHelmReleases(ctx, log, chartFile, "charts", g, commits)
 
 	require.Len(t, releases, 1)
 	assert.Equal(t, "1.0.0", releases[0].Chart.Version)
@@ -191,24 +191,24 @@ func TestCreateHelmReleases_InvalidChartYAML(t *testing.T) {
 func TestCreateHelmReleases_ValueDiffs(t *testing.T) {
 	g := newGitClientMock(t)
 	log := newTestLogger()
+	ctx := context.Background()
 
-	commits := []git.GitCommit{
+	commits := []git.Commit{
 		makeCommit("aaa", "v1"),
 		makeCommit("bbb", "v2"),
 	}
 
 	g.OnGetFileContent("aaa", chartFile).
-		TypedReturns(chartYAML("my-chart", "1.0.0"), nil).Once()
+		TypedReturns(chartYAML("1.0.0"), nil).Once()
 	g.OnGetFileContent("bbb", chartFile).
-		TypedReturns(chartYAML("my-chart", "2.0.0"), nil).Once()
+		TypedReturns(chartYAML("2.0.0"), nil).Once()
 
-	// createValueDiffs
 	g.OnGetFileContent("aaa", valuesFile).
 		TypedReturns("key: old", nil).Once()
 	g.OnGetDiffBetweenCommits("aaa", "bbb", valuesFile).
 		TypedReturns("- key: old\n+ key: new", nil).Once()
 
-	releases := CreateHelmReleases(log, chartFile, "charts", g, commits)
+	releases := CreateHelmReleases(ctx, log, chartFile, "charts", g, commits)
 
 	require.Len(t, releases, 2)
 	assert.Equal(t, "key: old", releases[0].ValueDiff)
