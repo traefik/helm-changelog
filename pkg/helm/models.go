@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/traefik/helm-changelog/pkg/git"
-	"gopkg.in/yaml.v3"
+	"go.yaml.in/yaml/v4"
 )
 
 // Chart contains all info about a chart from the Chart.yaml file.
