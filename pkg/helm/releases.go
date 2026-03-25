@@ -8,7 +8,13 @@ import (
 	"github.com/traefik/helm-changelog/pkg/git"
 )
 
-func CreateHelmReleases(log *logrus.Logger, chartFile, chartDir string, g git.Git, commits []git.GitCommit) []*Release {
+// GitClient defines the git operations needed to build changelogs.
+type GitClient interface {
+	GetFileContent(hash, filePath string) (string, error)
+	GetDiffBetweenCommits(start, end, diffPath string) (string, error)
+}
+
+func CreateHelmReleases(log *logrus.Logger, chartFile, chartDir string, g GitClient, commits []git.GitCommit) []*Release {
 	res := []*Release{}
 	currentRelease := ""
 	releaseCommits := []git.GitCommit{}
@@ -69,7 +75,7 @@ func CreateHelmReleases(log *logrus.Logger, chartFile, chartDir string, g git.Gi
 	return res
 }
 
-func createValueDiffs(res []*Release, g git.Git, chartFile, chartDir string) {
+func createValueDiffs(res []*Release, g GitClient, chartFile, chartDir string) {
 	fullValuesFile := filepath.Join(filepath.Dir(chartFile), "values.yaml")
 	relativeValuesFile := filepath.Join(chartDir, "values.yaml")
 	// Diff values files across versions

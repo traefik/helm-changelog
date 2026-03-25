@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/url"
 	"os"
+	"slices"
 	"sort"
 	"strings"
 
@@ -14,13 +15,11 @@ import (
 
 // Markdown creates a markdown representation of the changelog at the changeLogFilePath path
 func Markdown(log *logrus.Logger, changeLogFilePath string, releases []*helm.Release) {
-	// reverse commits
 	for _, release := range releases {
-		release.Commits = reverseCommits(release.Commits)
+		slices.Reverse(release.Commits)
 	}
 
-	// reverse releases
-	releases = reverseReleases(releases)
+	slices.Reverse(releases)
 
 	log.Debugf("Creating changelog file: %s", changeLogFilePath)
 	f, err := os.Create(changeLogFilePath)
