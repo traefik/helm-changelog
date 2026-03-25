@@ -205,38 +205,6 @@ func TestMarkdown(t *testing.T) {
 			},
 			golden: "testdata/with_kube_version.md",
 		},
-		{
-			name: "latest only with multiple releases",
-			releases: []*helm.Release{
-				{
-					ReleaseDate: date(1, 10),
-					Chart: helm.Chart{
-						APIVersion: "v2",
-						AppVersion: "2.0.0",
-						Name:       "my-chart",
-						Version:    "1.0.0",
-					},
-					Commits: []git.Commit{
-						{Subject: "feat: initial release"},
-					},
-				},
-				{
-					ReleaseDate: date(2, 20),
-					Chart: helm.Chart{
-						APIVersion: "v2",
-						AppVersion: "2.1.0",
-						Name:       "my-chart",
-						Version:    "2.0.0",
-					},
-					Commits: []git.Commit{
-						{Subject: "feat: new feature"},
-						{Subject: "chore: update deps"},
-					},
-				},
-			},
-			latestOnly: true,
-			golden:     "testdata/latest_only.md",
-		},
 	}
 
 	for _, tt := range tests {
@@ -260,4 +228,56 @@ func TestMarkdown(t *testing.T) {
 			assert.Equal(t, strings.ReplaceAll(string(expected), "\r\n", "\n"), strings.ReplaceAll(string(got), "\r\n", "\n"))
 		})
 	}
+}
+
+func TestMarkdown_LatestOnly(t *testing.T) {
+	existingChangelog, err := os.ReadFile("testdata/existing_changelog.md")
+	require.NoError(t, err)
+
+	dir := t.TempDir()
+	outPath := filepath.Join(dir, "Changelog.md")
+
+	require.NoError(t, os.WriteFile(outPath, existingChangelog, 0o644))
+
+	// Now generate with latestOnly=true, adding v2.0.0.
+	releases := []*helm.Release{
+		{
+			ReleaseDate: date(1, 10),
+			Chart: helm.Chart{
+				APIVersion: "v2",
+				AppVersion: "1.0.0",
+				Name:       "my-chart",
+				Version:    "1.0.0",
+			},
+			Commits: []git.Commit{
+				{Subject: "feat: initial release"},
+			},
+		},
+		{
+			ReleaseDate: date(2, 20),
+			Chart: helm.Chart{
+				APIVersion: "v2",
+				AppVersion: "2.0.0",
+				Name:       "my-chart",
+				Version:    "2.0.0",
+			},
+			Commits: []git.Commit{
+				{Subject: "feat: new feature"},
+			},
+		},
+	}
+
+	Markdown(newTestLogger(), outPath, releases, true)
+
+	got, err := os.ReadFile(outPath)
+	require.NoError(t, err)
+
+	result := strings.ReplaceAll(string(got), "\r\n", "\n")
+
+	// v2.0.0 should be present (newly generated).
+	assert.Contains(t, result, "## 2.0.0 ")
+	// v1.0.0 should still have the manually edited text.
+	assert.Contains(t, result, "manually edited")
+	// The header should appear only once.
+	assert.Equal(t, 1, strings.Count(result, "# Change Log"))
 }
