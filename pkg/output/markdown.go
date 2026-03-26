@@ -2,200 +2,200 @@
 package output
 
 import (
-	"fmt"
-	"net/url"
-	"os"
-	"path/filepath"
-	"slices"
-	"sort"
-	"strings"
+  "fmt"
+  "net/url"
+  "os"
+  "path/filepath"
+  "slices"
+  "sort"
+  "strings"
 
-	"github.com/rs/zerolog"
-	"github.com/traefik/helm-changelog/pkg/helm"
+  "github.com/rs/zerolog"
+  "github.com/traefik/helm-changelog/pkg/helm"
 )
 
 const changeLogHeader = "# Change Log\n\n"
 
 // Markdown creates a markdown representation of the changelog at the changeLogFilePath path.
 func Markdown(log *zerolog.Logger, changeLogFilePath string, releases []*helm.Release, update bool) {
-	for _, release := range releases {
-		slices.Reverse(release.Commits)
-	}
+  for _, release := range releases {
+    slices.Reverse(release.Commits)
+  }
 
-	slices.Reverse(releases)
+  slices.Reverse(releases)
 
-	log.Debug().Msgf("Creating changelog file: %s", changeLogFilePath)
+  log.Debug().Msgf("Creating changelog file: %s", changeLogFilePath)
 
-	if update && len(releases) > 0 {
-		writeLatestOnly(log, changeLogFilePath, releases[0])
+  if update && len(releases) > 0 {
+    writeLatestOnly(log, changeLogFilePath, releases[0])
 
-		return
-	}
+    return
+  }
 
-	writeAll(log, changeLogFilePath, releases)
+  writeAll(log, changeLogFilePath, releases)
 }
 
 func writeAll(log *zerolog.Logger, changeLogFilePath string, releases []*helm.Release) {
-	f, err := os.Create(filepath.Clean(changeLogFilePath))
-	if err != nil {
-		log.Fatal().Msg("Failed creating changelog file")
-	}
+  f, err := os.Create(filepath.Clean(changeLogFilePath))
+  if err != nil {
+    log.Fatal().Msg("Failed creating changelog file")
+  }
 
-	defer closeFile(log, f)
+  defer closeFile(log, f)
 
-	writeString(log, f, changeLogHeader)
+  writeString(log, f, changeLogHeader)
 
-	for _, release := range releases {
-		writeReleaseHeader(log, f, release)
-		writeReleaseBody(log, f, release)
-	}
+  for _, release := range releases {
+    writeReleaseHeader(log, f, release)
+    writeReleaseBody(log, f, release)
+  }
 
-	writeFooter(log, f)
+  writeFooter(log, f)
 }
 
 func writeLatestOnly(log *zerolog.Logger, changeLogFilePath string, latest *helm.Release) {
-	cleanPath := filepath.Clean(changeLogFilePath)
+  cleanPath := filepath.Clean(changeLogFilePath)
 
-	// Read existing changelog content if it exists.
-	var existingReleases string
+  // Read existing changelog content if it exists.
+  var existingReleases string
 
-	existing, err := os.ReadFile(cleanPath)
-	if err == nil {
-		existingReleases = extractExistingReleases(string(existing), latest.Chart.Version)
-	}
+  existing, err := os.ReadFile(cleanPath)
+  if err == nil {
+    existingReleases = extractExistingReleases(string(existing), latest.Chart.Version)
+  }
 
-	f, err := os.Create(cleanPath)
-	if err != nil {
-		log.Fatal().Msg("Failed creating changelog file")
-	}
+  f, err := os.Create(cleanPath)
+  if err != nil {
+    log.Fatal().Msg("Failed creating changelog file")
+  }
 
-	defer closeFile(log, f)
+  defer closeFile(log, f)
 
-	writeString(log, f, changeLogHeader)
-	writeReleaseHeader(log, f, latest)
-	writeReleaseBody(log, f, latest)
+  writeString(log, f, changeLogHeader)
+  writeReleaseHeader(log, f, latest)
+  writeReleaseBody(log, f, latest)
 
-	if existingReleases != "" {
-		writeString(log, f, existingReleases)
-	} else {
-		writeFooter(log, f)
-	}
+  if existingReleases != "" {
+    writeString(log, f, existingReleases)
+  } else {
+    writeFooter(log, f)
+  }
 }
 
 // extractExistingReleases returns the existing changelog content after the header,
 // excluding the section for the given version if it already exists.
 func extractExistingReleases(content, version string) string {
-	// Find the first release header.
-	idx := strings.Index(content, "\n## ")
-	if idx < 0 {
-		return ""
-	}
+  // Find the first release header.
+  idx := strings.Index(content, "\n## ")
+  if idx < 0 {
+    return ""
+  }
 
-	releases := content[idx:]
-	versionHeader := "\n## " + version + " "
+  releases := content[idx:]
+  versionHeader := "\n## " + version + " "
 
-	// If the version already exists, skip its section.
-	vIdx := strings.Index(releases, versionHeader)
-	if vIdx < 0 {
-		return releases
-	}
+  // If the version already exists, skip its section.
+  vIdx := strings.Index(releases, versionHeader)
+  if vIdx < 0 {
+    return releases
+  }
 
-	// Find the next release header after this version.
-	rest := releases[vIdx+1:]
-	nextIdx := strings.Index(rest, "\n## ")
+  // Find the next release header after this version.
+  rest := releases[vIdx+1:]
+  nextIdx := strings.Index(rest, "\n## ")
 
-	if nextIdx < 0 {
-		// This was the only/last release, keep everything before it.
-		return releases[:vIdx]
-	}
+  if nextIdx < 0 {
+    // This was the only/last release, keep everything before it.
+    return releases[:vIdx]
+  }
 
-	return releases[:vIdx] + rest[nextIdx:]
+  return releases[:vIdx] + rest[nextIdx:]
 }
 
 func writeReleaseHeader(log *zerolog.Logger, f *os.File, release *helm.Release) {
-	if release.Chart.Deprecated {
-		writeString(log, f, fmt.Sprintf("## %s (DEPRECATED)\n\n", release.Chart.Version))
-	} else {
-		writeString(log, f, fmt.Sprintf("## %s ", strings.TrimSpace(release.Chart.Version)))
-	}
+  if release.Chart.Deprecated {
+    writeString(log, f, fmt.Sprintf("## %s (DEPRECATED)\n\n", release.Chart.Version))
+  } else {
+    writeString(log, f, fmt.Sprintf("## %s ", strings.TrimSpace(release.Chart.Version)))
+  }
 
-	if release.Chart.AppVersion != "" {
-		writeString(log, f, badge("AppVersion", release.Chart.AppVersion, "", "success"))
-	}
+  if release.Chart.AppVersion != "" {
+    writeString(log, f, badge("AppVersion", release.Chart.AppVersion, "", "success"))
+  }
 
-	if release.Chart.KubeVersion != "" {
-		writeString(log, f, badge("Kubernetes", release.Chart.KubeVersion, "kubernetes", "informational"))
-	}
+  if release.Chart.KubeVersion != "" {
+    writeString(log, f, badge("Kubernetes", release.Chart.KubeVersion, "kubernetes", "informational"))
+  }
 
-	writeHelmBadges(log, f, release.Chart.APIVersion)
+  writeHelmBadges(log, f, release.Chart.APIVersion)
 
-	writeString(log, f, "\n\n")
+  writeString(log, f, "\n\n")
 }
 
 func writeHelmBadges(log *zerolog.Logger, f *os.File, apiVersion string) {
-	switch apiVersion {
-	case "":
-		writeString(log, f, badge("Helm", "v2", "helm", "inactive"))
-	case "v1":
-		writeString(log, f, badge("Helm", "v2", "helm", "inactive"))
-		writeString(log, f, badge("Helm", "v3", "helm", "informational"))
-	case "v2":
-		writeString(log, f, badge("Helm", "v3", "helm", "informational"))
-	}
+  switch apiVersion {
+  case "":
+    writeString(log, f, badge("Helm", "v2", "helm", "inactive"))
+  case "v1":
+    writeString(log, f, badge("Helm", "v2", "helm", "inactive"))
+    writeString(log, f, badge("Helm", "v3", "helm", "informational"))
+  case "v2":
+    writeString(log, f, badge("Helm", "v3", "helm", "informational"))
+  }
 }
 
 func writeReleaseBody(log *zerolog.Logger, f *os.File, release *helm.Release) {
-	if release.ReleaseDate != nil {
-		writeString(log, f, fmt.Sprintf(
-			"**Release date:** %s\n\n", release.ReleaseDate.Format("2006-01-02"),
-		))
-	}
+  if release.ReleaseDate != nil {
+    writeString(log, f, fmt.Sprintf(
+      "**Release date:** %s\n\n", release.ReleaseDate.Format("2006-01-02"),
+    ))
+  }
 
-	sort.Slice(release.Commits, func(i, j int) bool {
-		return release.Commits[i].Subject > release.Commits[j].Subject
-	})
+  sort.Slice(release.Commits, func(i, j int) bool {
+    return release.Commits[i].Subject > release.Commits[j].Subject
+  })
 
-	for _, l := range release.Commits {
-		writeString(log, f, fmt.Sprintf("* %s\n", l.Subject))
-	}
+  for _, l := range release.Commits {
+    writeString(log, f, fmt.Sprintf("* %s\n", l.Subject))
+  }
 
-	writeString(log, f, "\n")
+  writeString(log, f, "\n")
 
-	if release.ValueDiff != "" {
-		writeString(log, f, "### Default value changes\n\n")
-		writeString(log, f, "```diff\n")
-		writeString(log, f, release.ValueDiff)
-		writeString(log, f, "```\n")
-	}
+  if release.ValueDiff != "" {
+    writeString(log, f, "### Default value changes\n\n")
+    writeString(log, f, "```diff\n")
+    writeString(log, f, release.ValueDiff)
+    writeString(log, f, "```\n")
+  }
 
-	writeString(log, f, "\n")
+  writeString(log, f, "\n")
 }
 
 func writeFooter(log *zerolog.Logger, f *os.File) {
-	writeString(log, f, "---\n")
-	writeString(log, f,
-		"Autogenerated from Helm Chart and git history using "+
-			"[helm-changelog](https://github.com/mogensen/helm-changelog)\n",
-	)
+  writeString(log, f, "---\n")
+  writeString(log, f,
+    "Autogenerated from Helm Chart and git history using "+
+      "[helm-changelog](https://github.com/traefik/helm-changelog)\n",
+  )
 }
 
 func closeFile(log *zerolog.Logger, f *os.File) {
-	cerr := f.Close()
-	if cerr != nil {
-		log.Error().Err(cerr).Msg("Failed closing changelog file")
-	}
+  cerr := f.Close()
+  if cerr != nil {
+    log.Error().Err(cerr).Msg("Failed closing changelog file")
+  }
 }
 
 func writeString(log *zerolog.Logger, f *os.File, s string) {
-	_, err := f.WriteString(s)
-	if err != nil {
-		log.Error().Err(err).Msg("Failed writing to changelog file")
-	}
+  _, err := f.WriteString(s)
+  if err != nil {
+    log.Error().Err(err).Msg("Failed writing to changelog file")
+  }
 }
 
 func badge(key, value, icon, style string) string {
-	return fmt.Sprintf(
-		" ![%s: %s](https://img.shields.io/static/v1?label=%s&message=%s&color=%s&logo=%s)",
-		key, value, key, url.QueryEscape(value), style, icon,
-	)
+  return fmt.Sprintf(
+    " ![%s: %s](https://img.shields.io/static/v1?label=%s&message=%s&color=%s&logo=%s)",
+    key, value, key, url.QueryEscape(value), style, icon,
+  )
 }
