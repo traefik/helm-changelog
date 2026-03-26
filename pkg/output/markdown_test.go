@@ -3,7 +3,6 @@ package output
 import (
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 	"time"
 
@@ -24,6 +23,19 @@ func date(month, day int) *time.Time {
 	t := time.Date(2025, time.Month(month), day, 0, 0, 0, 0, time.UTC)
 
 	return &t
+}
+
+func assertGolden(t *testing.T, goldenPath string, got []byte) {
+	t.Helper()
+
+	if os.Getenv("UPDATE_GOLDEN") == "1" {
+		require.NoError(t, os.WriteFile(goldenPath, got, 0o644))
+	}
+
+	expected, err := os.ReadFile(goldenPath)
+	require.NoError(t, err, "Golden file %s not found. Run with UPDATE_GOLDEN=1 to create it.", goldenPath)
+
+	assert.Equal(t, string(expected), string(got))
 }
 
 func TestMarkdown(t *testing.T) {
@@ -217,16 +229,37 @@ func TestMarkdown(t *testing.T) {
 			got, err := os.ReadFile(outPath)
 			require.NoError(t, err)
 
-			if os.Getenv("UPDATE_GOLDEN") == "1" {
-				require.NoError(t, os.WriteFile(tt.golden, got, 0o644))
-			}
-
-			expected, err := os.ReadFile(tt.golden)
-			require.NoError(t, err, "Golden file %s not found. Run with UPDATE_GOLDEN=1 to create it.", tt.golden)
-
-			// Normalize line endings for cross-platform compatibility.
-			assert.Equal(t, strings.ReplaceAll(string(expected), "\r\n", "\n"), strings.ReplaceAll(string(got), "\r\n", "\n"))
+			assertGolden(t, tt.golden, got)
 		})
+	}
+}
+
+func updateReleases() []*helm.Release {
+	return []*helm.Release{
+		{
+			ReleaseDate: date(1, 10),
+			Chart: helm.Chart{
+				APIVersion: "v2",
+				AppVersion: "1.0.0",
+				Name:       "my-chart",
+				Version:    "1.0.0",
+			},
+			Commits: []git.Commit{
+				{Subject: "feat: initial release"},
+			},
+		},
+		{
+			ReleaseDate: date(2, 20),
+			Chart: helm.Chart{
+				APIVersion: "v2",
+				AppVersion: "2.0.0",
+				Name:       "my-chart",
+				Version:    "2.0.0",
+			},
+			Commits: []git.Commit{
+				{Subject: "feat: new feature"},
+			},
+		},
 	}
 }
 
@@ -239,7 +272,49 @@ func TestMarkdown_Update(t *testing.T) {
 
 	require.NoError(t, os.WriteFile(outPath, existingChangelog, 0o644))
 
-	// Now generate with update=true, adding v2.0.0.
+	Markdown(newTestLogger(), outPath, updateReleases(), true)
+
+	got, err := os.ReadFile(outPath)
+	require.NoError(t, err)
+
+	assertGolden(t, "testdata/update.md", got)
+}
+
+func TestMarkdown_Update_Idempotent(t *testing.T) {
+	existingChangelog, err := os.ReadFile("testdata/existing_changelog.md")
+	require.NoError(t, err)
+
+	dir := t.TempDir()
+	outPath := filepath.Join(dir, "Changelog.md")
+
+	require.NoError(t, os.WriteFile(outPath, existingChangelog, 0o644))
+
+	// First run.
+	Markdown(newTestLogger(), outPath, updateReleases(), true)
+
+	first, err := os.ReadFile(outPath)
+	require.NoError(t, err)
+
+	// Second run on the same file.
+	Markdown(newTestLogger(), outPath, updateReleases(), true)
+
+	second, err := os.ReadFile(outPath)
+	require.NoError(t, err)
+
+	assert.Equal(t, string(first), string(second))
+}
+
+func TestMarkdown_Update_ReplacesExistingVersion(t *testing.T) {
+	// Changelog already contains v2.0.0 (from a previous --update run).
+	existingWithV2, err := os.ReadFile("testdata/update.md")
+	require.NoError(t, err)
+
+	dir := t.TempDir()
+	outPath := filepath.Join(dir, "Changelog.md")
+
+	require.NoError(t, os.WriteFile(outPath, existingWithV2, 0o644))
+
+	// Re-run --update with an updated v2.0.0 (new commit added).
 	releases := []*helm.Release{
 		{
 			ReleaseDate: date(1, 10),
@@ -263,6 +338,7 @@ func TestMarkdown_Update(t *testing.T) {
 			},
 			Commits: []git.Commit{
 				{Subject: "feat: new feature"},
+				{Subject: "fix: important bugfix"},
 			},
 		},
 	}
@@ -272,50 +348,5 @@ func TestMarkdown_Update(t *testing.T) {
 	got, err := os.ReadFile(outPath)
 	require.NoError(t, err)
 
-	result := strings.ReplaceAll(string(got), "\r\n", "\n")
-
-	// v2.0.0 should be present (newly generated).
-	assert.Contains(t, result, "## 2.0.0 ")
-	// v1.0.0 should still have the manually edited text.
-	assert.Contains(t, result, "manually edited")
-	// The header should appear only once.
-	assert.Equal(t, 1, strings.Count(result, "# Change Log"))
-
-	// Run again with fresh releases — should be idempotent (no duplicate v2.0.0).
-	releases2 := []*helm.Release{
-		{
-			ReleaseDate: date(1, 10),
-			Chart: helm.Chart{
-				APIVersion: "v2",
-				AppVersion: "1.0.0",
-				Name:       "my-chart",
-				Version:    "1.0.0",
-			},
-			Commits: []git.Commit{
-				{Subject: "feat: initial release"},
-			},
-		},
-		{
-			ReleaseDate: date(2, 20),
-			Chart: helm.Chart{
-				APIVersion: "v2",
-				AppVersion: "2.0.0",
-				Name:       "my-chart",
-				Version:    "2.0.0",
-			},
-			Commits: []git.Commit{
-				{Subject: "feat: new feature"},
-			},
-		},
-	}
-
-	Markdown(newTestLogger(), outPath, releases2, true)
-
-	got2, err := os.ReadFile(outPath)
-	require.NoError(t, err)
-
-	result2 := strings.ReplaceAll(string(got2), "\r\n", "\n")
-
-	assert.Equal(t, 1, strings.Count(result2, "## 2.0.0 "))
-	assert.Contains(t, result2, "manually edited")
+	assertGolden(t, "testdata/update_replace.md", got)
 }
