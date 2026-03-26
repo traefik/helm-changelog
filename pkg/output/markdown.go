@@ -61,13 +61,7 @@ func writeLatestOnly(log *zerolog.Logger, changeLogFilePath string, latest *helm
 
 	existing, err := os.ReadFile(cleanPath)
 	if err == nil {
-		content := string(existing)
-
-		// Find the first release header (## ) after the changelog title.
-		idx := strings.Index(content, "\n## ")
-		if idx >= 0 {
-			existingReleases = content[idx:]
-		}
+		existingReleases = extractExistingReleases(string(existing), latest.Chart.Version)
 	}
 
 	f, err := os.Create(cleanPath)
@@ -86,6 +80,36 @@ func writeLatestOnly(log *zerolog.Logger, changeLogFilePath string, latest *helm
 	} else {
 		writeFooter(log, f)
 	}
+}
+
+// extractExistingReleases returns the existing changelog content after the header,
+// excluding the section for the given version if it already exists.
+func extractExistingReleases(content, version string) string {
+	// Find the first release header.
+	idx := strings.Index(content, "\n## ")
+	if idx < 0 {
+		return ""
+	}
+
+	releases := content[idx:]
+	versionHeader := "\n## " + version + " "
+
+	// If the version already exists, skip its section.
+	vIdx := strings.Index(releases, versionHeader)
+	if vIdx < 0 {
+		return releases
+	}
+
+	// Find the next release header after this version.
+	rest := releases[vIdx+1:]
+	nextIdx := strings.Index(rest, "\n## ")
+
+	if nextIdx < 0 {
+		// This was the only/last release, keep everything before it.
+		return releases[:vIdx]
+	}
+
+	return releases[:vIdx] + rest[nextIdx:]
 }
 
 func writeReleaseHeader(log *zerolog.Logger, f *os.File, release *helm.Release) {

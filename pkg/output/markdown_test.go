@@ -280,4 +280,42 @@ func TestMarkdown_Update(t *testing.T) {
 	assert.Contains(t, result, "manually edited")
 	// The header should appear only once.
 	assert.Equal(t, 1, strings.Count(result, "# Change Log"))
+
+	// Run again with fresh releases — should be idempotent (no duplicate v2.0.0).
+	releases2 := []*helm.Release{
+		{
+			ReleaseDate: date(1, 10),
+			Chart: helm.Chart{
+				APIVersion: "v2",
+				AppVersion: "1.0.0",
+				Name:       "my-chart",
+				Version:    "1.0.0",
+			},
+			Commits: []git.Commit{
+				{Subject: "feat: initial release"},
+			},
+		},
+		{
+			ReleaseDate: date(2, 20),
+			Chart: helm.Chart{
+				APIVersion: "v2",
+				AppVersion: "2.0.0",
+				Name:       "my-chart",
+				Version:    "2.0.0",
+			},
+			Commits: []git.Commit{
+				{Subject: "feat: new feature"},
+			},
+		},
+	}
+
+	Markdown(newTestLogger(), outPath, releases2, true)
+
+	got2, err := os.ReadFile(outPath)
+	require.NoError(t, err)
+
+	result2 := strings.ReplaceAll(string(got2), "\r\n", "\n")
+
+	assert.Equal(t, 1, strings.Count(result2, "## 2.0.0 "))
+	assert.Contains(t, result2, "manually edited")
 }
