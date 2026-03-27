@@ -277,7 +277,7 @@ func TestMarkdown_Update(t *testing.T) {
 	got, err := os.ReadFile(outPath)
 	require.NoError(t, err)
 
-	assertGolden(t, "testdata/update.md", got)
+	assertGolden(t, "testdata/update_existing_changelog.md", got)
 }
 
 func TestMarkdown_Update_Idempotent(t *testing.T) {
@@ -306,7 +306,7 @@ func TestMarkdown_Update_Idempotent(t *testing.T) {
 
 func TestMarkdown_Update_ReplacesExistingVersion(t *testing.T) {
 	// Changelog already contains v2.0.0 (from a previous --update run).
-	existingWithV2, err := os.ReadFile("testdata/update.md")
+	existingWithV2, err := os.ReadFile("testdata/update_existing_changelog.md")
 	require.NoError(t, err)
 
 	dir := t.TempDir()
@@ -348,5 +348,5 @@ func TestMarkdown_Update_ReplacesExistingVersion(t *testing.T) {
 	got, err := os.ReadFile(outPath)
 	require.NoError(t, err)
 
-	assertGolden(t, "testdata/update_replace.md", got)
+	assertGolden(t, "testdata/update_inplace_existing_changelog.md", got)
 }
