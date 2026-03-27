@@ -1,7 +1,7 @@
 # helm-changelog
 
-[![Build Status](https://img.shields.io/endpoint.svg?url=https%3A%2F%2Factions-badge.atrox.dev%2Fmogensen%2Fhelm-changelog%2Fbadge%3Fref%3Dmain&style=flat)](https://actions-badge.atrox.dev/mogensen/helm-changelog/goto?ref=main)
-[![Go Report Card](https://goreportcard.com/badge/github.com/mogensen/helm-changelog)](https://goreportcard.com/report/github.com/mogensen/helm-changelog)
+[![Build Status](https://img.shields.io/endpoint.svg?url=https%3A%2F%2Factions-badge.atrox.dev%2Ftraefik%2Fhelm-changelog%2Fbadge%3Fref%3Dmain&style=flat)](https://actions-badge.atrox.dev/traefik/helm-changelog/goto?ref=main)
+[![Go Report Card](https://goreportcard.com/badge/github.com/traefik/helm-changelog)](https://goreportcard.com/report/github.com/traefik/helm-changelog)
 
 Create changelogs for Helm Charts, based on git history.
 
@@ -25,7 +25,7 @@ The changelog contains the following things:
 
 This repository contains a set of example changelogs created for the github.com/prometheus-community/helm-charts charts.
 
- - [examples](https://github.com/mogensen/helm-changelog/tree/main/examples/)
+ - [examples](https://github.com/traefik/helm-changelog/tree/main/examples/)
  
 ## Installation
 
@@ -67,7 +67,7 @@ This is done in a multi-stage build, and does not require a working go developme
 $ make image
 
 # Run the resulting docker image
-$ docker run -it --rm -v $(pwd):/data mogensen/helm-changelog:latest
+$ docker run -it --rm -v $(pwd):/data traefik/helm-changelog:latest
 ```
 
 The helm-changelog app is running as a non-root user.
@@ -76,7 +76,7 @@ This is a security best-practice. If user `1000` does not have write access to t
 
 ```bash
 # Run docker image as current user
-$ docker run --user $UID it --rm -v $(pwd):/data mogensen/helm-changelog:latest
+$ docker run --user $UID it --rm -v $(pwd):/data traefik/helm-changelog:latest
 ```
 
 ---

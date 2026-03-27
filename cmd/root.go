@@ -33,6 +33,11 @@ func Execute() {
 				Value:   zerolog.WarnLevel.String(),
 				Usage:   "Log level (trace, debug, info, warn, error, fatal, panic)",
 			},
+			&cli.BoolFlag{
+				Name:    "update",
+				Aliases: []string{"u"},
+				Usage:   "Prepend the latest release to the existing changelog without overwriting previous entries",
+			},
 		},
 		Before: func(ctx context.Context, cmd *cli.Command) (context.Context, error) {
 			log, err := setUpLogs(cmd.String("verbosity"))
@@ -58,6 +63,7 @@ func Execute() {
 func run(ctx context.Context, cmd *cli.Command) error {
 	log := zerolog.Ctx(ctx)
 	changelogFilename := cmd.String("filename")
+	update := cmd.Bool("update")
 
 	currentDir, err := os.Getwd()
 	if err != nil {
@@ -94,7 +100,7 @@ func run(ctx context.Context, cmd *cli.Command) error {
 		releases := helm.CreateHelmReleases(ctx, log, chartFile, relativeChartDir, g, allCommits)
 
 		changeLogFilePath := filepath.Join(fullChartDir, changelogFilename)
-		output.Markdown(log, changeLogFilePath, releases)
+		output.Markdown(log, changeLogFilePath, releases, update)
 	}
 
 	return nil

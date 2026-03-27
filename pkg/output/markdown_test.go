@@ -3,7 +3,6 @@ package output
 import (
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 	"time"
 
@@ -26,10 +25,24 @@ func date(month, day int) *time.Time {
 	return &t
 }
 
+func assertGolden(t *testing.T, goldenPath string, got []byte) {
+	t.Helper()
+
+	if os.Getenv("UPDATE_GOLDEN") == "1" {
+		require.NoError(t, os.WriteFile(goldenPath, got, 0o644))
+	}
+
+	expected, err := os.ReadFile(goldenPath)
+	require.NoError(t, err, "Golden file %s not found. Run with UPDATE_GOLDEN=1 to create it.", goldenPath)
+
+	assert.Equal(t, string(expected), string(got))
+}
+
 func TestMarkdown(t *testing.T) {
 	tests := []struct {
 		name     string
 		releases []*helm.Release
+		update   bool
 		golden   string
 	}{
 		{
@@ -211,20 +224,129 @@ func TestMarkdown(t *testing.T) {
 			dir := t.TempDir()
 			outPath := filepath.Join(dir, "Changelog.md")
 
-			Markdown(newTestLogger(), outPath, tt.releases)
+			Markdown(newTestLogger(), outPath, tt.releases, tt.update)
 
 			got, err := os.ReadFile(outPath)
 			require.NoError(t, err)
 
-			if os.Getenv("UPDATE_GOLDEN") == "1" {
-				require.NoError(t, os.WriteFile(tt.golden, got, 0o644))
-			}
-
-			expected, err := os.ReadFile(tt.golden)
-			require.NoError(t, err, "Golden file %s not found. Run with UPDATE_GOLDEN=1 to create it.", tt.golden)
-
-			// Normalize line endings for cross-platform compatibility.
-			assert.Equal(t, strings.ReplaceAll(string(expected), "\r\n", "\n"), strings.ReplaceAll(string(got), "\r\n", "\n"))
+			assertGolden(t, tt.golden, got)
 		})
 	}
+}
+
+func updateReleases() []*helm.Release {
+	return []*helm.Release{
+		{
+			ReleaseDate: date(1, 10),
+			Chart: helm.Chart{
+				APIVersion: "v2",
+				AppVersion: "1.0.0",
+				Name:       "my-chart",
+				Version:    "1.0.0",
+			},
+			Commits: []git.Commit{
+				{Subject: "feat: initial release"},
+			},
+		},
+		{
+			ReleaseDate: date(2, 20),
+			Chart: helm.Chart{
+				APIVersion: "v2",
+				AppVersion: "2.0.0",
+				Name:       "my-chart",
+				Version:    "2.0.0",
+			},
+			Commits: []git.Commit{
+				{Subject: "feat: new feature"},
+			},
+		},
+	}
+}
+
+func TestMarkdown_Update(t *testing.T) {
+	existingChangelog, err := os.ReadFile("testdata/existing_changelog.md")
+	require.NoError(t, err)
+
+	dir := t.TempDir()
+	outPath := filepath.Join(dir, "Changelog.md")
+
+	require.NoError(t, os.WriteFile(outPath, existingChangelog, 0o644))
+
+	Markdown(newTestLogger(), outPath, updateReleases(), true)
+
+	got, err := os.ReadFile(outPath)
+	require.NoError(t, err)
+
+	assertGolden(t, "testdata/update_existing_changelog.md", got)
+}
+
+func TestMarkdown_Update_Idempotent(t *testing.T) {
+	existingChangelog, err := os.ReadFile("testdata/existing_changelog.md")
+	require.NoError(t, err)
+
+	dir := t.TempDir()
+	outPath := filepath.Join(dir, "Changelog.md")
+
+	require.NoError(t, os.WriteFile(outPath, existingChangelog, 0o644))
+
+	// First run.
+	Markdown(newTestLogger(), outPath, updateReleases(), true)
+
+	first, err := os.ReadFile(outPath)
+	require.NoError(t, err)
+
+	// Second run on the same file.
+	Markdown(newTestLogger(), outPath, updateReleases(), true)
+
+	second, err := os.ReadFile(outPath)
+	require.NoError(t, err)
+
+	assert.Equal(t, string(first), string(second))
+}
+
+func TestMarkdown_Update_ReplacesExistingVersion(t *testing.T) {
+	// Changelog already contains v2.0.0 (from a previous --update run).
+	existingWithV2, err := os.ReadFile("testdata/update_existing_changelog.md")
+	require.NoError(t, err)
+
+	dir := t.TempDir()
+	outPath := filepath.Join(dir, "Changelog.md")
+
+	require.NoError(t, os.WriteFile(outPath, existingWithV2, 0o644))
+
+	// Re-run --update with an updated v2.0.0 (new commit added).
+	releases := []*helm.Release{
+		{
+			ReleaseDate: date(1, 10),
+			Chart: helm.Chart{
+				APIVersion: "v2",
+				AppVersion: "1.0.0",
+				Name:       "my-chart",
+				Version:    "1.0.0",
+			},
+			Commits: []git.Commit{
+				{Subject: "feat: initial release"},
+			},
+		},
+		{
+			ReleaseDate: date(2, 20),
+			Chart: helm.Chart{
+				APIVersion: "v2",
+				AppVersion: "2.0.0",
+				Name:       "my-chart",
+				Version:    "2.0.0",
+			},
+			Commits: []git.Commit{
+				{Subject: "feat: new feature"},
+				{Subject: "fix: important bugfix"},
+			},
+		},
+	}
+
+	Markdown(newTestLogger(), outPath, releases, true)
+
+	got, err := os.ReadFile(outPath)
+	require.NoError(t, err)
+
+	assertGolden(t, "testdata/update_inplace_existing_changelog.md", got)
 }
